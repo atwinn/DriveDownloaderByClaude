@@ -2,7 +2,7 @@
 # Run ON a Windows machine (PyInstaller can't cross-compile from macOS).
 #
 # Prerequisites on Windows:
-#   - Python 3.10–3.12 from python.org (tick "Add to PATH")
+#   - Python 3.10-3.12 from python.org (tick "Add to PATH")
 #   - rclone.exe must sit next to this script (already included in the repo)
 #
 # Usage (in PowerShell, from the project folder):
@@ -19,7 +19,7 @@ if (-not (Test-Path ".venv")) { python -m venv .venv }
 Write-Host "==> 2/3  Icon + build .exe (PyInstaller)"
 & .\.venv\Scripts\python.exe make_icon.py
 if (-not (Test-Path "rclone.exe")) {
-  Write-Host "    rclone.exe missing — downloading rclone for windows-amd64…"
+  Write-Host "    rclone.exe missing -- downloading rclone for windows-amd64..."
   $zip = "$env:TEMP\rclone-win.zip"
   Invoke-WebRequest -Uri "https://downloads.rclone.org/rclone-current-windows-amd64.zip" -OutFile $zip
   Expand-Archive -Path $zip -DestinationPath "$env:TEMP\rclone-win" -Force
