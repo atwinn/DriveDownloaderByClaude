@@ -291,8 +291,24 @@ function titleFor(j) {
   return j.name || t('fetchingInfo');
 }
 
+let rendering = false;
+let hasActive = false;
+
 async function render() {
+  if (!api || rendering) return;     // never overlap bridge calls (Windows/WebView2)
+  rendering = true;
+  try {
+    await renderInner();
+  } catch (e) {
+    /* a bridge hiccup: skip this tick, the poll loop will retry */
+  } finally {
+    rendering = false;
+  }
+}
+
+async function renderInner() {
   const jobs = await api.list_downloads();
+  hasActive = jobs.some(j => j.status === 'downloading' || j.status === 'queued');
   const list = document.getElementById('list');
   if (!jobs.length) {
     list.innerHTML = `<div class="empty"><div class="big">📥</div><div>${t('empty')}</div></div>`;
@@ -349,11 +365,18 @@ function escapeHtml(s) {
   return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
 
+async function pollLoop() {
+  await render();
+  // poll fast while something is active, slow down when idle to ease the
+  // Windows/WebView2 bridge and avoid call pile-up.
+  setTimeout(pollLoop, hasActive ? 900 : 3000);
+}
+
 async function boot() {
   api = window.pywebview.api;
   await loadSettings();
   applyLang();          // applyLang triggers refreshAuth + render
-  setInterval(render, 900);
+  pollLoop();
 }
 window.addEventListener('pywebviewready', boot);
 if (window.pywebview && window.pywebview.api) boot();
