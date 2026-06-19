@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drive Downloader</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #181b22; --panel2: #1f232c; --border: #2a2f3a;
+    --text: #e6e9ef; --muted: #8b94a3; --accent: #4f8cff; --accent2: #3a6fd8;
+    --ok: #36c98e; --err: #ff6b6b; --warn: #f5a623;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--text); -webkit-user-select: none; user-select: none;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 14px 18px;
+    border-bottom: 1px solid var(--border); background: var(--panel);
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  .logo { width: 26px; height: 26px; border-radius: 7px;
+    background: linear-gradient(135deg, var(--accent), #7b5cff); display: grid; place-items: center;
+    font-size: 15px; }
+  .spacer { flex: 1; }
+  .auth { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--err); }
+  .dot.ok { background: var(--ok); }
+  button {
+    font: inherit; border: 1px solid var(--border); background: var(--panel2); color: var(--text);
+    padding: 7px 13px; border-radius: 8px; cursor: pointer; transition: .15s;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.primary:hover { background: var(--accent2); }
+  button.ghost { background: transparent; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.sm { padding: 4px 9px; font-size: 12px; }
+  #langBtn { font-weight: 700; min-width: 38px; }
+  main { padding: 18px; max-width: 860px; margin: 0 auto; }
+  .add {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px; margin-bottom: 18px;
+  }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row + .row { margin-top: 10px; }
+  input[type=text] {
+    flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 9px 11px; border-radius: 8px; font: inherit;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--accent); }
+  .dest { flex: 1; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; background: var(--bg); border: 1px solid var(--border);
+    padding: 8px 11px; border-radius: 8px; }
+  .listhead { display: flex; align-items: center; margin: 0 2px 10px; }
+  .listhead h2 { font-size: 13px; color: var(--muted); margin: 0; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .04em; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 13px 15px; margin-bottom: 10px;
+  }
+  .card .top { display: flex; align-items: center; gap: 10px; }
+  .fname { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border);
+    color: var(--muted); white-space: nowrap; }
+  .badge.downloading { color: var(--accent); border-color: var(--accent); }
+  .badge.done { color: var(--ok); border-color: var(--ok); }
+  .badge.error, .badge.interrupted { color: var(--err); border-color: var(--err); }
+  .badge.cancelled { color: var(--warn); border-color: var(--warn); }
+  .bar { height: 7px; background: var(--panel2); border-radius: 20px; margin: 11px 0 7px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), #7b5cff);
+    width: 0%; transition: width .4s ease; border-radius: 20px; }
+  .bar.done > i { background: var(--ok); }
+  .meta { display: flex; gap: 16px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .meta b { color: var(--text); font-weight: 600; }
+  .meta .file { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .actions { display: flex; gap: 6px; margin-top: 10px; }
+  .err { color: var(--err); font-size: 12px; margin-top: 8px; white-space: pre-wrap;
+    background: rgba(255,107,107,.08); padding: 8px 10px; border-radius: 7px; }
+  .empty { text-align: center; color: var(--muted); padding: 50px 20px; }
+  .empty .big { font-size: 40px; opacity: .4; }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    background: var(--err); color: #fff; padding: 10px 16px; border-radius: 9px;
+    font-size: 13px; box-shadow: 0 6px 24px rgba(0,0,0,.4); opacity: 0; transition: .25s;
+    pointer-events: none; max-width: 80%; }
+  .toast.show { opacity: 1; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none;
+    place-items: center; z-index: 50; }
+  .modal.show { display: grid; }
+  .modal .box { background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    padding: 22px; max-width: 420px; text-align: center; }
+  .modal h3 { margin: 0 0 8px; }
+  .modal p { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+  .modal pre { text-align: left; background: var(--bg); padding: 10px; border-radius: 8px;
+    font-size: 11px; color: var(--err); max-height: 140px; overflow: auto; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">⬇</div>
+  <h1>Drive Downloader</h1>
+  <div class="spacer"></div>
+  <button class="ghost sm" id="langBtn" onclick="toggleLang()" title="Language">EN</button>
+  <div class="auth">
+    <span class="dot" id="authDot"></span>
+    <span id="authText">…</span>
+    <button class="ghost sm" id="authBtn" onclick="onAuthBtn()">Sign in</button>
+  </div>
+</header>
+
+<main>
+  <div class="add">
+    <div class="row">
+      <input type="text" id="link" data-i18n-ph="linkPlaceholder"
+             onkeydown="if(event.key==='Enter')addDownload()">
+      <button class="primary" id="addBtn" data-i18n="btnDownload" onclick="addDownload()"></button>
+    </div>
+    <div class="row">
+      <span class="dest" id="dest" title="">…</span>
+      <button class="sm" data-i18n="btnPickFolder" onclick="pickFolder()"></button>
+      <button class="sm" data-i18n="btnOpen" onclick="api.open_folder(null)"></button>
+    </div>
+  </div>
+
+  <div class="listhead">
+    <h2 data-i18n="listTitle"></h2>
+    <div class="spacer"></div>
+    <button class="ghost sm" data-i18n="btnClearDone" onclick="clearFinished()"></button>
+  </div>
+  <div id="list"></div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal" id="loginModal">
+  <div class="box">
+    <h3 id="lmTitle"></h3>
+    <p id="lmMsg"></p>
+    <pre id="lmErr" style="display:none"></pre>
+    <button class="primary" id="lmBtn" onclick="closeLogin()"></button>
+  </div>
+</div>
+
+<script>
+const I18N = {
+  vi: {
+    authChecking:"Đang kiểm tra…", authIn:"Đã đăng nhập", authOut:"Chưa đăng nhập",
+    btnLogin:"Đăng nhập", btnLogout:"Đăng xuất",
+    linkPlaceholder:"Dán link Google Drive (file hoặc folder)…",
+    btnDownload:"Tải xuống", btnPickFolder:"Chọn thư mục", btnOpen:"Mở",
+    listTitle:"Danh sách tải", btnClearDone:"Xoá mục đã xong",
+    empty:"Chưa có file nào. Dán link Drive ở trên để bắt đầu.",
+    loginTitle:"Đăng nhập Google",
+    loginIntro:"Một cửa sổ trình duyệt sẽ mở ra. Hãy đăng nhập và cấp quyền, rồi quay lại đây.",
+    loginRunning:"Đang mở trình duyệt để đăng nhập Google…",
+    loginDone:"✅ Đăng nhập thành công.", loginFailed:"Đăng nhập thất bại:",
+    loginTimeout:"Hết thời gian chờ đăng nhập (5 phút).",
+    btnClose:"Đóng", btnWaiting:"Đang chờ…",
+    st_queued:"Đang chờ", st_downloading:"Đang tải", st_done:"Hoàn tất",
+    st_error:"Lỗi", st_cancelled:"Đã huỷ", st_interrupted:"Bị gián đoạn",
+    btnCancel:"Huỷ", btnRetry:"Thử lại", btnOpenFolder:"Mở thư mục", btnRemove:"Xoá",
+    fetchingName:"📁 Đang lấy tên thư mục…", fetchingInfo:"Đang lấy thông tin…",
+    scanning:"đang quét…", filesDone:"file xong", filesWord:"file", etaLeft:"còn",
+    err_bad_link:"Không nhận diện được link Drive.",
+    err_gdoc:"Đây là file Google Docs/Sheets/Slides (định dạng riêng), không tải trực tiếp được. Hãy dùng File > Tải xuống trong Docs.",
+    err_bad_dest:"Thư mục lưu không hợp lệ.", err_unknown:"Lỗi không xác định.",
+  },
+  en: {
+    authChecking:"Checking…", authIn:"Signed in", authOut:"Not signed in",
+    btnLogin:"Sign in", btnLogout:"Sign out",
+    linkPlaceholder:"Paste a Google Drive link (file or folder)…",
+    btnDownload:"Download", btnPickFolder:"Choose folder", btnOpen:"Open",
+    listTitle:"Downloads", btnClearDone:"Clear finished",
+    empty:"Nothing yet. Paste a Drive link above to start.",
+    loginTitle:"Sign in to Google",
+    loginIntro:"A browser window will open. Sign in and grant access, then come back here.",
+    loginRunning:"Opening your browser to sign in to Google…",
+    loginDone:"✅ Signed in.", loginFailed:"Sign-in failed:",
+    loginTimeout:"Sign-in timed out (5 minutes).",
+    btnClose:"Close", btnWaiting:"Waiting…",
+    st_queued:"Queued", st_downloading:"Downloading", st_done:"Done",
+    st_error:"Error", st_cancelled:"Cancelled", st_interrupted:"Interrupted",
+    btnCancel:"Cancel", btnRetry:"Retry", btnOpenFolder:"Open folder", btnRemove:"Remove",
+    fetchingName:"📁 Getting folder name…", fetchingInfo:"Getting info…",
+    scanning:"scanning…", filesDone:"files done", filesWord:"files", etaLeft:"left",
+    err_bad_link:"Couldn't recognize the Drive link.",
+    err_gdoc:"This is a Google Docs/Sheets/Slides file (native format) and can't be downloaded directly. Use File > Download inside Docs.",
+    err_bad_dest:"Invalid save folder.", err_unknown:"Unknown error.",
+  }
+};
+let api = null;
+let lang = "vi";
+let currentDest = "";
+
+function t(k){ return (I18N[lang] && I18N[lang][k]) || I18N.vi[k] || k; }
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t(el.dataset.i18nPh));
+  document.getElementById('langBtn').textContent = (lang === 'vi') ? 'EN' : 'VI';
+  document.getElementById('lmTitle').textContent = t('loginTitle');
+  refreshAuth(); render();
+}
+
+async function toggleLang() {
+  lang = (lang === 'vi') ? 'en' : 'vi';
+  await api.set_lang(lang);
+  applyLang();
+}
+
+async function refreshAuth() {
+  const s = await api.auth_status();
+  const dot = document.getElementById('authDot');
+  const txt = document.getElementById('authText');
+  const btn = document.getElementById('authBtn');
+  if (s.configured) {
+    dot.classList.add('ok'); txt.textContent = t('authIn'); btn.textContent = t('btnLogout');
+  } else {
+    dot.classList.remove('ok'); txt.textContent = t('authOut'); btn.textContent = t('btnLogin');
+  }
+  document.getElementById('addBtn').disabled = !s.configured;
+}
+
+async function onAuthBtn() {
+  const s = await api.auth_status();
+  if (s.configured) { await api.logout(); refreshAuth(); return; }
+  document.getElementById('loginModal').classList.add('show');
+  document.getElementById('lmErr').style.display = 'none';
+  document.getElementById('lmMsg').textContent = t('loginIntro');
+  const btn = document.getElementById('lmBtn');
+  btn.textContent = t('btnWaiting'); btn.disabled = true;
+  await api.start_login();
+  pollLogin();
+}
+
+async function pollLogin() {
+  const st = await api.login_status();
+  const msg = document.getElementById('lmMsg');
+  const btn = document.getElementById('lmBtn');
+  if (st.state === 'running') { msg.textContent = t('loginRunning'); setTimeout(pollLogin, 1000); return; }
+  btn.disabled = false; btn.textContent = t('btnClose');
+  if (st.state === 'done') { msg.textContent = t('loginDone'); refreshAuth(); }
+  else if (st.state === 'error') {
+    msg.textContent = t('loginFailed');
+    const e = document.getElementById('lmErr');
+    e.style.display = 'block';
+    e.textContent = (st.message === 'timeout') ? t('loginTimeout') : (st.message || '');
+  }
+}
+function closeLogin() { document.getElementById('loginModal').classList.remove('show'); }
+
+async function loadSettings() {
+  const s = await api.get_settings();
+  currentDest = s.default_dest;
+  lang = (s.lang === 'en') ? 'en' : 'vi';
+  const d = document.getElementById('dest');
+  d.textContent = currentDest; d.title = currentDest;
+}
+
+async function pickFolder() {
+  const p = await api.pick_folder();
+  if (p) { await api.set_default_dest(p); loadSettings(); }
+}
+
+async function addDownload() {
+  const input = document.getElementById('link');
+  const link = input.value.trim();
+  if (!link) return;
+  const r = await api.add_download(link, currentDest);
+  if (r.ok) { input.value = ''; render(); }
+  else toast(t('err_' + (r.error_code || 'unknown')) || t('err_unknown'));
+}
+
+async function clearFinished() { await api.clear_finished(); render(); }
+
+function titleFor(j) {
+  if (j.kind === 'folder') {
+    if (!j.folder_name) return t('fetchingName');
+    let s = '📁 ' + j.folder_name;
+    if (j.status === 'downloading' && !j.files_done) s += ' — ' + t('scanning');
+    return s;
+  }
+  return j.name || t('fetchingInfo');
+}
+
+async function render() {
+  const jobs = await api.list_downloads();
+  const list = document.getElementById('list');
+  if (!jobs.length) {
+    list.innerHTML = `<div class="empty"><div class="big">📥</div><div>${t('empty')}</div></div>`;
+    return;
+  }
+  list.innerHTML = jobs.map(j => {
+    const isDone = j.status === 'done';
+    const sizeInfo = j.total ? `${j.transferred || '0'} / ${j.total}` : (j.transferred || '');
+    const sp = j.save_path || j.dest;
+    const meta = [];
+    if (j.status === 'downloading') {
+      if (sizeInfo) meta.push(`<span><b>${sizeInfo}</b></span>`);
+      if (j.speed) meta.push(`<span>⚡ <b>${j.speed}</b></span>`);
+      if (j.eta) meta.push(`<span>⏱ ${t('etaLeft')} <b>${j.eta}</b></span>`);
+      if (j.files_done) meta.push(`<span>✓ <b>${j.files_done}</b> ${t('filesDone')}</span>`);
+      if (j.kind === 'folder' && j.last_file)
+        meta.push(`<span class="file">📄 ${escapeHtml(j.last_file)}</span>`);
+    } else if (isDone) {
+      if (j.total) meta.push(`<span><b>${j.total}</b></span>`);
+      if (j.files_done) meta.push(`<span>✓ <b>${j.files_done}</b> ${t('filesWord')}</span>`);
+    }
+    meta.push(`<span class="file" title="${sp}">📁 ${sp.split('/').pop() || sp}</span>`);
+
+    const actions = [];
+    if (j.status === 'downloading' || j.status === 'queued')
+      actions.push(`<button class="sm" onclick="act('cancel','${j.id}')">${t('btnCancel')}</button>`);
+    if (['error','cancelled','interrupted'].includes(j.status))
+      actions.push(`<button class="sm" onclick="act('retry','${j.id}')">${t('btnRetry')}</button>`);
+    if (isDone)
+      actions.push(`<button class="sm" onclick="api.open_folder('${sp.replace(/'/g,"\\'")}')">${t('btnOpenFolder')}</button>`);
+    actions.push(`<button class="sm ghost" onclick="act('remove','${j.id}')">${t('btnRemove')}</button>`);
+
+    return `<div class="card">
+      <div class="top">
+        <span class="fname">${escapeHtml(titleFor(j))}</span>
+        <span class="badge ${j.status}">${t('st_' + j.status)}</span>
+      </div>
+      <div class="bar ${isDone?'done':''}"><i style="width:${isDone?100:j.percent}%"></i></div>
+      <div class="meta">${meta.join('')}</div>
+      ${j.error ? `<div class="err">${escapeHtml(j.error)}</div>` : ''}
+      <div class="actions">${actions.join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+async function act(kind, id) {
+  if (kind === 'cancel') await api.cancel_download(id);
+  else if (kind === 'retry') await api.retry_download(id);
+  else if (kind === 'remove') await api.remove_download(id, false);
+  render();
+}
+
+function escapeHtml(s) {
+  return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+async function boot() {
+  api = window.pywebview.api;
+  await loadSettings();
+  applyLang();          // applyLang triggers refreshAuth + render
+  setInterval(render, 900);
+}
+window.addEventListener('pywebviewready', boot);
+if (window.pywebview && window.pywebview.api) boot();
+</script>
+</body>
+</html>
